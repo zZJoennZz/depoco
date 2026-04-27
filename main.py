@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from google import genai
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from typing import Optional
 
 load_dotenv()
 
@@ -33,7 +34,7 @@ supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_
 
 class DepoChunk(BaseModel):
     text: str
-    session_id: str
+    session_id: Optional[str] = None
 
 @app.get("/")
 async def health_check():
