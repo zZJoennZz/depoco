@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depoco Debug Interface</title>
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --accent: #2563eb; --success: #22c55e; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 800px; margin: 0 auto; line-height: 1.5; }
+        .section { background: var(--card); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        h2 { margin-top: 0; font-size: 1rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        textarea { width: 100%; background: #0f172a; border: 1px solid #334155; color: white; padding: 0.75rem; border-radius: 6px; resize: vertical; min-height: 100px; box-sizing: border-box; font-size: 1rem; }
+        button { background: var(--accent); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 1rem; transition: opacity 0.2s; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Formatted Output Styling */
+        .result-box { margin-top: 1.5rem; padding: 1rem; border-radius: 8px; background: #0f172a; border-left: 4px solid var(--accent); display: none; }
+        .suggestion-text { font-size: 1.1rem; color: #fff; margin-bottom: 1rem; white-space: pre-wrap; }
+        .evidence-tag { font-size: 0.8rem; background: #334155; padding: 0.25rem 0.5rem; border-radius: 4px; color: #cbd5e1; display: inline-block; margin-right: 0.5rem; }
+        .status-msg { color: var(--success); font-weight: bold; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+
+    <header style="margin-bottom: 2rem;">
+        <h1 style="margin: 0;">Depoco v2.0</h1>
+        <p style="color: #94a3b8; margin: 0.5rem 0 0 0;">AI Deposition Assistant | Internal Debugger</p>
+    </header>
+
+    <div class="section">
+        <h2>Live Testimony Analysis</h2>
+        <textarea id="testimonyInput" placeholder="Enter witness testimony..."></textarea>
+        <button id="suggestBtn">Generate Follow-up</button>
+        
+        <div id="suggestOutput" class="result-box">
+            <div id="suggestContent" class="suggestion-text"></div>
+            <div id="evidenceList"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Evidence Ingestion</h2>
+        <input type="file" id="pdfFile" accept=".pdf">
+        <button id="uploadBtn">Upload & Vectorize</button>
+        
+        <div id="uploadOutput" class="result-box">
+            <div class="status-msg">Upload Successful</div>
+            <div id="uploadContent" style="color: #94a3b8;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+
+        // --- Suggestion Logic ---
+        document.getElementById('suggestBtn').onclick = async () => {
+            const btn = document.getElementById('suggestBtn');
+            const outDiv = document.getElementById('suggestOutput');
+            const textEl = document.getElementById('suggestContent');
+            const evidEl = document.getElementById('evidenceList');
+            const testimony = document.getElementById('testimonyInput').value;
+
+            if (!testimony) return alert("Please enter testimony text.");
+            
+            btn.disabled = true;
+            outDiv.style.display = 'block';
+            textEl.innerText = "Processing analysis...";
+            evidEl.innerHTML = "";
+
+            try {
+                const res = await fetch(`${API_BASE}/suggest-question`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: testimony, session_id: "web-test-001" })
+                });
+                
+                const data = await res.json();
+
+                // Format the Suggestion
+                textEl.innerText = data.suggestion || "No suggestion generated.";
+                
+                // Format the Evidence Tags
+                if (data.evidence_used && data.evidence_used.length > 0) {
+                    evidEl.innerHTML = `<p style="font-size: 0.8rem; color: #64748b; margin: 1rem 0 0.5rem 0;">SOURCES CONSULTED:</p>`;
+                    data.evidence_used.forEach(ev => {
+                        const span = document.createElement('span');
+                        span.className = 'evidence-tag';
+                        span.innerText = ev.title || "Document Chunk";
+                        evidEl.appendChild(span);
+                    });
+                }
+            } catch (err) {
+                textEl.innerText = "Error: " + err.message;
+            } finally {
+                btn.disabled = false;
+            }
+        };
+
+        // --- Ingestion Logic ---
+        document.getElementById('uploadBtn').onclick = async () => {
+            const btn = document.getElementById('uploadBtn');
+            const outDiv = document.getElementById('uploadOutput');
+            const contentEl = document.getElementById('uploadContent');
+            const fileInput = document.getElementById('pdfFile');
+            
+            if (!fileInput.files[0]) return alert("Please select a PDF file.");
+
+            btn.disabled = true;
+            outDiv.style.display = 'block';
+            contentEl.innerText = "Uploading to Render and vectorizing chunks...";
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const res = await fetch(`${API_BASE}/ingest-document`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                contentEl.innerText = `Processed ${data.chunks_processed} semantic chunks into Supabase.`;
+            } catch (err) {
+                contentEl.innerText = "Error: " + err.message;
+            } finally {
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
